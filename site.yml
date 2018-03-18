@@ -1,0 +1,72 @@
+---
+- name: POPFileを稼働させる
+  hosts: all
+  become: true
+  tasks:
+
+  - name: TimeZoneをJST(日本時間)に設定する
+    timezone:
+      name: Asia/Tokyo
+    
+  - name: POPFileパッケーとその関連パッケージをインストール
+    apt: name={{ item }} state=present update_cache=yes
+    with_items:
+      - popfile
+      - language-pack-ja
+      - awscli
+
+  - name: localeを生成する
+    locale_gen:
+      name: ja_JP.UTF-8
+      state: present
+
+  - name: localeの確認
+    command: echo $LANG
+    register: lang_result
+    changed_when: false
+
+  - name: localeをja_JP.UTF-8にする。
+    command: update-locale LANG=ja_JP.UTF-8
+    when: "not 'ja_JP.UTF-8' in lang_result.stdout_lines"
+    
+  - name: 各種ファイルの上書きに備え、POPFileを一度止める。
+    service:
+      name: popfile
+      state: stopped
+
+  - name: 事前に取得しておいた設定ファイルと学習データファイルをコピーする。
+    copy:
+      src:  tmp/var/lib/popfile/
+      dest: /var/lib/popfile/
+      owner: popfile
+      group: popfile
+      
+  - name: POPFileをリスタートさせる。
+    service:
+      name: popfile
+      state: restarted
+
+  - name: シェルクスクリプト設置用のフォルダを作成する
+    file:
+      path: ./bin
+      state: directory
+      owner: "{{ ansible_user }}"
+      mode: 0755
+      
+  - name: S3バックアップ用のシェルスクリプトを設置する
+    copy:
+      src: files/popfile_back.sh
+      dest: ./bin/popfile_back.sh
+      owner: "{{ ansible_user }}"
+      mode: 0755
+      
+      
+- name: 環境変数を設定する
+  hosts: all
+  become: false
+  tasks:
+    - name: 環境変数を設定するためのファイルをコピーする
+      template:
+        src: templates/dot_bash_profile.jinja2
+        dest: "/home/{{ ansible_user }}/.bash_profile"
+  

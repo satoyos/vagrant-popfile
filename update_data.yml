@@ -1,0 +1,22 @@
+---
+- name: POPFileの辞書と設定をアップデートする
+  hosts: all
+  become: true
+  tasks:
+
+  - name: 各種ファイルの上書きに備え、POPFileを一度止める。
+    service:
+      name: popfile
+      state: stopped
+
+  - name: 事前に取得しておいた設定ファイルと学習データファイルをコピーする。
+    copy:
+      src:  tmp/var/lib/popfile/
+      dest: /var/lib/popfile/
+      owner: popfile
+      group: popfile
+      
+  - name: POPFileをリスタートさせる。
+    service:
+      name: popfile
+      state: restarted
